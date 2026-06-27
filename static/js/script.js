@@ -13,10 +13,8 @@ function setupEventListeners() {
     
     const uploadBtn = document.getElementById('imageUploadBtn');
     const imageInput = document.getElementById('imageInput');
-    if (uploadBtn && imageInput) {
-        uploadBtn.addEventListener('click', () => imageInput.click());
-        imageInput.addEventListener('change', handleImageUpload);
-    }
+    uploadBtn.addEventListener('click', () => imageInput.click());
+    imageInput.addEventListener('change', handleImageUpload);
 }
 
 async function startConversion() {
@@ -36,17 +34,13 @@ async function startConversion() {
     updateStatus('⏳ در حال تبدیل متن به صدا...', 'info');
     
     const progressSection = document.querySelector('.progress-section');
-    if (progressSection) {
-        progressSection.style.display = 'flex';
-    }
+    progressSection.style.display = 'flex';
     updateProgress(0);
     
     try {
         const response = await fetch('/generate-speech', {
             method: 'POST',
-            headers: { 
-                'Content-Type': 'application/json'
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 text: text,
                 language: isEnglish ? 'english' : 'persian',
@@ -77,27 +71,20 @@ async function startConversion() {
     } finally {
         document.getElementById('startBtn').disabled = false;
         setTimeout(() => {
-            const progressSection = document.querySelector('.progress-section');
-            if (progressSection) {
-                progressSection.style.display = 'none';
-            }
+            document.querySelector('.progress-section').style.display = 'none';
         }, 3000);
     }
 }
 
 function updateProgress(value) {
-    const progressBar = document.getElementById('progressBar');
-    const progressText = document.getElementById('progressText');
-    if (progressBar) progressBar.value = value;
-    if (progressText) progressText.textContent = value + '%';
+    document.getElementById('progressBar').value = value;
+    document.getElementById('progressText').textContent = value + '%';
 }
 
 function updateStatus(message, type = 'info') {
     const status = document.getElementById('status');
-    if (status) {
-        status.textContent = message;
-        status.className = 'status ' + type;
-    }
+    status.textContent = message;
+    status.className = 'status ' + type;
 }
 
 function saveAudio() {
@@ -129,31 +116,24 @@ async function handleImageUpload(event) {
         reader.readAsDataURL(file);
         
         reader.onload = async function() {
-            try {
-                const response = await fetch('/extract-text', {
-                    method: 'POST',
-                    headers: { 
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ image: reader.result })
-                });
-                
-                if (!response.ok) {
-                    const error = await response.json();
-                    throw new Error(error.error || 'خطا در پردازش تصویر');
-                }
-                
-                const data = await response.json();
-                
-                if (data.text) {
-                    document.getElementById('textInput').value = data.text;
-                    updateStatus('✅ متن با موفقیت استخراج شد', 'success');
-                } else {
-                    updateStatus('⚠️ متنی در تصویر یافت نشد', 'error');
-                }
-            } catch (error) {
-                console.error('Error:', error);
-                updateStatus('❌ خطا: ' + error.message, 'error');
+            const response = await fetch('/extract-text', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ image: reader.result })
+            });
+            
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.error || 'خطا در پردازش تصویر');
+            }
+            
+            const data = await response.json();
+            
+            if (data.text) {
+                document.getElementById('textInput').value = data.text;
+                updateStatus('✅ متن با موفقیت استخراج شد', 'success');
+            } else {
+                updateStatus('⚠️ متنی در تصویر یافت نشد', 'error');
             }
         };
         
