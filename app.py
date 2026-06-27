@@ -8,6 +8,7 @@ from PIL import Image
 import base64
 import io
 import time
+from gtts import gTTS  # اضافه شده برای انگلیسی
 
 app = Flask(__name__)
 
@@ -35,8 +36,8 @@ VOICES = {
     }
 }
 
-# تابع تبدیل با تلاش مجدد
-async def text_to_speech(text, voice, rate, retries=3):
+# تابع تبدیل با تلاش مجدد برای edge-tts
+async def text_to_speech_edge(text, voice, rate, retries=3):
     for attempt in range(retries):
         try:
             temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.mp3')
@@ -51,10 +52,21 @@ async def text_to_speech(text, voice, rate, retries=3):
         except Exception as e:
             if attempt < retries - 1:
                 print(f"تلاش {attempt+1} ناموفق بود، دوباره تلاش می‌شود...")
-                await asyncio.sleep(2)  # 2 ثانیه صبر کن
+                await asyncio.sleep(2)
                 continue
             else:
                 raise e
+
+# تابع تبدیل با gTTS برای انگلیسی
+def text_to_speech_gtts(text):
+    temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.mp3')
+    temp_path = temp_file.name
+    temp_file.close()
+    
+    tts = gTTS(text=text, lang='en', slow=False)
+    tts.save(temp_path)
+    
+    return temp_path
 
 @app.route('/')
 def index():
@@ -80,13 +92,25 @@ def generate_speech():
         if not text:
             return jsonify({'error': 'لطفا متن را وارد کنید'}), 400
         
-        voice = VOICES[language][voice_type]
-        
-        # تبدیل با تلاش مجدد
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        temp_path = loop.run_until_complete(text_to_speech(text, voice, rate))
-        loop.close()
+        # اگر زبان فارسی است از edge-tts استفاده کن
+        if language == 'persian':
+            try:
+                voice = VOICES['persian'][voice_type]
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                temp_path = loop.run_until_complete(text_to_speech_edge(text, voice, rate))
+                loop.close()
+            except Exception as e:
+                # اگر خطای 403 داد، پیام مناسب برگردان
+                if '403' in str(e) or 'Invalid response' in str(e):
+                    return jsonify({
+                        'error': '⚠️ سرویس تبدیل صدای فارسی به دلیل تحریم در دسترس نیست. لطفاً از VPN استفاده کنید یا زبان انگلیسی را انتخاب کنید.'
+                    }), 403
+                else:
+                    raise e
+        else:
+            # انگلیسی - از gTTS استفاده کن (بدون تحریم)
+            temp_path = text_to_speech_gtts(text)
         
         return send_file(
             temp_path,
@@ -134,12 +158,24 @@ def download_audio():
         if not text:
             return jsonify({'error': 'متن وارد نشده است'}), 400
         
-        voice = VOICES[language][voice_type]
-        
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        temp_path = loop.run_until_complete(text_to_speech(text, voice, '+0%'))
-        loop.close()
+        # اگر زبان فارسی است از edge-tts استفاده کن
+        if language == 'persian':
+            try:
+                voice = VOICES['persian'][voice_type]
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                temp_path = loop.run_until_complete(text_to_speech_edge(text, voice, '+0%'))
+                loop.close()
+            except Exception as e:
+                if '403' in str(e) or 'Invalid response' in str(e):
+                    return jsonify({
+                        'error': '⚠️ سرویس فارسی در دسترس نیست. لطفاً از VPN استفاده کنید.'
+                    }), 403
+                else:
+                    raise e
+        else:
+            # انگلیسی - از gTTS استفاده کن
+            temp_path = text_to_speech_gtts(text)
         
         return send_file(
             temp_path,
