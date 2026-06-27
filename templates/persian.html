@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>تبدیل متن فارسی به صدا</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <a href="/" class="back-btn">← بازگشت</a>
+            <div class="logo">🎤 VOICE AI</div>
+        </div>
+        
+        <div class="tts-container">
+            <div class="settings-group">
+                <h3>⚙️ تنظیمات صدا</h3>
+                
+                <div class="setting-row">
+                    <label>جنسیت صدا:</label>
+                    <select id="gender">
+                        <option value="male">آقا</option>
+                        <option value="female" selected>خانم</option>
+                    </select>
+                </div>
+                
+                <div class="setting-row">
+                    <label>تعداد تکرار:</label>
+                    <select id="repeat">
+                        <option value="1">بدون تکرار</option>
+                        <option value="2">2 بار</option>
+                        <option value="3">3 بار</option>
+                        <option value="4">4 بار</option>
+                    </select>
+                </div>
+                
+                <div class="setting-row">
+                    <label>تاخیر بین کلمات:</label>
+                    <select id="delay">
+                        <option value="0">بدون تاخیر</option>
+                        <option value="0.1">0.1 ثانیه</option>
+                        <option value="0.3">0.3 ثانیه</option>
+                        <option value="0.5">0.5 ثانیه</option>
+                        <option value="1.0">1.0 ثانیه</option>
+                    </select>
+                </div>
+                
+                <div class="setting-row">
+                    <label>سرعت گفتار:</label>
+                    <select id="rate">
+                        <option value="+0%">معمولی</option>
+                        <option value="+20%">سریع</option>
+                        <option value="+50%">خیلی سریع</option>
+                        <option value="-20%">آهسته</option>
+                        <option value="-50%">خیلی آهسته</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="text-area">
+                <h3>✏️ متن خود را وارد کنید</h3>
+                <textarea id="textInput" placeholder="متن فارسی خود را اینجا وارد کنید..."></textarea>
+            </div>
+            
+            <div class="progress-section" style="display:none">
+                <label>پیشرفت:</label>
+                <progress id="progressBar" value="0" max="100"></progress>
+                <span id="progressText">0%</span>
+            </div>
+            
+            <div class="image-upload">
+                <button id="imageUploadBtn">📷 استخراج متن از تصویر</button>
+                <input type="file" id="imageInput" accept="image/*" style="display:none">
+            </div>
+            
+            <div class="actions">
+                <button id="startBtn" class="start-btn">▶ شروع تبدیل</button>
+                <button id="saveBtn" class="save-btn" disabled>💾 ذخیره صدا</button>
+            </div>
+            
+            <div id="status" class="status">✅ آماده</div>
+            
+            <audio id="audioPlayer" style="display:none"></audio>
+        </div>
+    </div>
+    
+    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+</body>
+</html>
