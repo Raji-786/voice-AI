@@ -35,8 +35,8 @@ VOICES = {
     }
 }
 
-# تابع تبدیل با تلاش مجدد
-async def text_to_speech(text, voice, rate, retries=3):
+# تابع تبدیل با تلاش مجدد (5 بار با صبر 5 ثانیه)
+async def text_to_speech_edge(text, voice, rate, retries=5):
     for attempt in range(retries):
         try:
             temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.mp3')
@@ -49,10 +49,14 @@ async def text_to_speech(text, voice, rate, retries=3):
             return temp_path
             
         except Exception as e:
-            if attempt < retries - 1:
-                print(f"تلاش {attempt+1} ناموفق بود، دوباره تلاش می‌شود...")
-                await asyncio.sleep(2)  # 2 ثانیه صبر کن
-                continue
+            if '403' in str(e) or 'Invalid response' in str(e):
+                if attempt < retries - 1:
+                    print(f"⚠️ تلاش {attempt+1} با خطا مواجه شد، صبر میکنم و دوباره تلاش میکنم...")
+                    await asyncio.sleep(5)  # 5 ثانیه صبر کن
+                    continue
+                else:
+                    print("❌ بعد از 5 تلاش، سرویس در دسترس نیست.")
+                    raise Exception("سرویس تبدیل صدا در حال حاضر در دسترس نیست. لطفاً چند دقیقه بعد دوباره امتحان کنید.")
             else:
                 raise e
 
@@ -85,7 +89,7 @@ def generate_speech():
         # تبدیل با تلاش مجدد
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
-        temp_path = loop.run_until_complete(text_to_speech(text, voice, rate))
+        temp_path = loop.run_until_complete(text_to_speech_edge(text, voice, rate))
         loop.close()
         
         return send_file(
@@ -138,7 +142,7 @@ def download_audio():
         
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
-        temp_path = loop.run_until_complete(text_to_speech(text, voice, '+0%'))
+        temp_path = loop.run_until_complete(text_to_speech_edge(text, voice, '+0%'))
         loop.close()
         
         return send_file(
@@ -152,4 +156,4 @@ def download_audio():
         return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000)  
+    app.run(debug=True, host='0.0.0.0', port=5000)
