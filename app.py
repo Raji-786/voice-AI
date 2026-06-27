@@ -5,7 +5,7 @@ import pytesseract
 from PIL import Image
 import base64
 import io
-from gtts import gTTS
+from google.cloud import texttospeech
 import time
 
 app = Flask(__name__)
@@ -23,7 +23,49 @@ if os.name == 'nt':
     pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
 
 # ============================================
-# صفحه اصلی
+# راه‌اندازی Google TTS
+# ============================================
+# کلید API خودت رو اینجا بذار
+os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = 'path/to/your-service-account-file.json'
+
+def text_to_speech_google(text, language):
+    client = texttospeech.TextToSpeechClient()
+    
+    # تنظیمات ورودی
+    synthesis_input = texttospeech.SynthesisInput(text=text)
+    
+    # تنظیمات صدا
+    if language == 'persian':
+        voice = texttospeech.VoiceSelectionParams(
+            language_code='fa-IR',
+            name='fa-IR-Standard-A',  # صدای فارسی
+            ssml_gender=texttospeech.SsmlVoiceGender.FEMALE
+        )
+    else:
+        voice = texttospeech.VoiceSelectionParams(
+            language_code='en-US',
+            name='en-US-Neural2-J',  # صدای انگلیسی (Neural)
+            ssml_gender=texttospeech.SsmlVoiceGender.FEMALE
+        )
+    
+    # تنظیمات خروجی
+    audio_config = texttospeech.AudioConfig(
+        audio_encoding=texttospeech.AudioEncoding.MP3,
+        speaking_rate=1.0,
+        pitch=0.0
+    )
+    
+    # درخواست
+    response = client.synthesize_speech(
+        input=synthesis_input,
+        voice=voice,
+        audio_config=audio_config
+    )
+    
+    return response.audio_content
+
+# ============================================
+# صفحات
 # ============================================
 @app.route('/')
 def index():
@@ -50,22 +92,17 @@ def generate_speech():
         if not text:
             return jsonify({'error': 'لطفا متن را وارد کنید'}), 400
         
-        # ایجاد فایل موقت
+        # تبدیل با Google TTS
+        audio_content = text_to_speech_google(text, language)
+        
+        # فایل موقت
         temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.mp3')
         temp_path = temp_file.name
         temp_file.close()
         
-        # تبدیل با gTTS
-        if language == 'persian':
-            # ✅ برای فارسی از 'ar' استفاده کن (جایگزین 'fa')
-            tts = gTTS(text=text, lang='ar', slow=False)
-        else:
-            # انگلیسی
-            tts = gTTS(text=text, lang='en', slow=False)
+        with open(temp_path, 'wb') as f:
+            f.write(audio_content)
         
-        tts.save(temp_path)
-        
-        # برگرداندن فایل صوتی
         return send_file(
             temp_path,
             mimetype='audio/mpeg',
@@ -77,7 +114,7 @@ def generate_speech():
         return jsonify({'error': str(e)}), 500
 
 # ============================================
-# استخراج متن از تصویر (OCR)
+# استخراج متن از تصویر
 # ============================================
 @app.route('/extract-text', methods=['POST'])
 def extract_text():
@@ -88,14 +125,12 @@ def extract_text():
         if not image_data:
             return jsonify({'error': 'تصویر ارسال نشده است'}), 400
         
-        # حذف header base64
         if ',' in image_data:
             image_data = image_data.split(',')[1]
         
         image_bytes = base64.b64decode(image_data)
         image = Image.open(io.BytesIO(image_bytes))
         
-        # استخراج متن (فارسی و انگلیسی)
         text = pytesseract.image_to_string(image, lang='eng+fas').strip()
         
         if not text:
@@ -107,7 +142,7 @@ def extract_text():
         return jsonify({'error': str(e)}), 500
 
 # ============================================
-# دانلود فایل صوتی
+# دانلود
 # ============================================
 @app.route('/download', methods=['POST'])
 def download_audio():
@@ -119,18 +154,14 @@ def download_audio():
         if not text:
             return jsonify({'error': 'متن وارد نشده است'}), 400
         
-        # ایجاد فایل موقت
+        audio_content = text_to_speech_google(text, language)
+        
         temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.mp3')
         temp_path = temp_file.name
         temp_file.close()
         
-        # تبدیل با gTTS
-        if language == 'persian':
-            tts = gTTS(text=text, lang='ar', slow=False)
-        else:
-            tts = gTTS(text=text, lang='en', slow=False)
-        
-        tts.save(temp_path)
+        with open(temp_path, 'wb') as f:
+            f.write(audio_content)
         
         return send_file(
             temp_path,
