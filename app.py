@@ -1,7 +1,6 @@
 from flask import Flask, render_template, request, jsonify, send_file
-import edge_tts
+from gtts import gTTS
 import os
-import asyncio
 import tempfile
 import pytesseract
 from PIL import Image
@@ -23,38 +22,45 @@ def after_request(response):
 if os.name == 'nt':
     pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
 
-# صداها
-VOICES = {
-    'persian': {
-        'male': 'fa-IR-FaridNeural',
-        'female': 'fa-IR-DilaraNeural'
-    },
-    'english': {
-        'male': 'en-US-GuyNeural',
-        'female': 'en-US-JennyNeural'
-    }
+# تنظیمات زبان‌ها برای gTTS
+# gTTS از کدهای زبان استاندارد استفاده می‌کند
+LANGUAGE_CODES = {
+    'persian': 'fa',  # فارسی
+    'english': 'en'   # انگلیسی
 }
 
-# تابع تبدیل با تلاش مجدد
-async def text_to_speech(text, voice, rate, retries=3):
-    for attempt in range(retries):
-        try:
-            temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.mp3')
-            temp_path = temp_file.name
-            temp_file.close()
-            
-            communicate = edge_tts.Communicate(text=text, voice=voice, rate=rate)
-            await communicate.save(temp_path)
-            
-            return temp_path
-            
-        except Exception as e:
-            if attempt < retries - 1:
-                print(f"تلاش {attempt+1} ناموفق بود، دوباره تلاش می‌شود...")
-                await asyncio.sleep(2)  # 2 ثانیه صبر کن
-                continue
-            else:
-                raise e
+# gTTS سرعت (تنظیم سرعت در gTTS محدودتر است)
+# gTTS از پارامتر slow=True/False برای سرعت آهسته/عادی استفاده می‌کند
+# برای تغییر سرعت بیشتر باید از کتابخانه‌های دیگر یا پردازش بعدی استفاده کرد
+
+def text_to_speech(text, language, slow=False):
+    """
+    تبدیل متن به گفتار با استفاده از gTTS
+    
+    Args:
+        text: متن ورودی
+        language: کد زبان ('fa' یا 'en')
+        slow: سرعت آهسته (True) یا عادی (False)
+    
+    Returns:
+        مسیر فایل موقت MP3
+    """
+    try:
+        # ایجاد فایل موقت
+        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.mp3')
+        temp_path = temp_file.name
+        temp_file.close()
+        
+        # ایجاد شیء gTTS
+        tts = gTTS(text=text, lang=language, slow=slow)
+        
+        # ذخیره فایل
+        tts.save(temp_path)
+        
+        return temp_path
+        
+    except Exception as e:
+        raise Exception(f"خطا در تبدیل متن به گفتار: {str(e)}")
 
 @app.route('/')
 def index():
@@ -74,19 +80,22 @@ def generate_speech():
         data = request.get_json()
         text = data.get('text', '').strip()
         language = data.get('language', 'persian')
-        voice_type = data.get('voice', 'male')
-        rate = data.get('rate', '+0%')
+        voice_type = data.get('voice', 'male')  # gTTS از جنسیت پشتیبانی نمی‌کند
+        rate = data.get('rate', '+0%')  # gTTS از تنظیم سرعت دقیق پشتیبانی نمی‌کند
         
         if not text:
             return jsonify({'error': 'لطفا متن را وارد کنید'}), 400
         
-        voice = VOICES[language][voice_type]
+        # تبدیل کد زبان
+        lang_code = LANGUAGE_CODES.get(language, 'fa')
         
-        # تبدیل با تلاش مجدد
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        temp_path = loop.run_until_complete(text_to_speech(text, voice, rate))
-        loop.close()
+        # تنظیم سرعت آهسته اگر rate منفی باشد
+        slow = False
+        if rate and rate.startswith('-'):
+            slow = True
+        
+        # تبدیل متن به گفتار
+        temp_path = text_to_speech(text, lang_code, slow)
         
         return send_file(
             temp_path,
@@ -129,17 +138,16 @@ def download_audio():
         data = request.get_json()
         text = data.get('text', '').strip()
         language = data.get('language', 'persian')
-        voice_type = data.get('voice', 'male')
+        voice_type = data.get('voice', 'male')  # gTTS از جنسیت پشتیبانی نمی‌کند
         
         if not text:
             return jsonify({'error': 'متن وارد نشده است'}), 400
         
-        voice = VOICES[language][voice_type]
+        # تبدیل کد زبان
+        lang_code = LANGUAGE_CODES.get(language, 'fa')
         
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        temp_path = loop.run_until_complete(text_to_speech(text, voice, '+0%'))
-        loop.close()
+        # تبدیل متن به گفتار
+        temp_path = text_to_speech(text, lang_code)
         
         return send_file(
             temp_path,
