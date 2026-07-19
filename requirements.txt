@@ -1,5 +1,5 @@
 Flask==2.3.3
-gTTS==2.4.0
+edge-tts==6.1.9
 pytesseract==0.3.10
 Pillow==11.3.0
 pydub==0.25.1
